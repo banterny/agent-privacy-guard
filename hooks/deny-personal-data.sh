@@ -58,7 +58,12 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 # (Claude Code's account file: your name, organisation and login email;
 # Claude Code itself still reads and writes it).
 # File tools are judged by the path they touch (so a note that merely
-# mentions the folder can still be edited); every other tool by its whole input.
+# mentions the folder can still be edited); every other tool by its whole input,
+# except the desktop app's own tools and charts, which cannot read files (a
+# task list or summary that mentions a locked path is just text).
+if [[ "$TOOL" =~ ^mcp__(ccd_[a-z_]+|visualize)__ ]]; then
+  APP_TOOL=1
+fi
 FILE_TOOLS='^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__(read|write|edit|multiedit|grep|glob|list|ls))$'
 PATH_FIELDS='if (.tool_name | test($ft))
   then [.tool_input | (.file_path, .filePath, .notebook_path, .path,
@@ -113,7 +118,9 @@ LOCKED=""
 # to the shell), then slashes tidied (// and /./ collapsed). A tripwire only:
 # a shell can still build the path with wildcards or variables, which is what
 # the sandbox's read block is for.
-if printf '%s' "$INPUT" | jq -r --arg t "$TOOL" --arg ft "$FILE_TOOLS" "$PATH_FIELDS" 2>/dev/null |
+if [ -n "$APP_TOOL" ]; then
+  :
+elif printf '%s' "$INPUT" | jq -r --arg t "$TOOL" --arg ft "$FILE_TOOLS" "$PATH_FIELDS" 2>/dev/null |
   tr -d '"\\'"'" | sed -E 's#/+#/#g; s#/(\./)+#/#g' |
   grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt|(^|[^a-z0-9_])\.claude\.json'; then
   LOCKED=1
