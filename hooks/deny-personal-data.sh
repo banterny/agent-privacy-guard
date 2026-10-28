@@ -116,19 +116,20 @@ LOWER=$(printf '%s' "$TEXT" | tr '[:upper:]' '[:lower:]')
 D1=$(decode "$LOWER" | tr '[:upper:]' '[:lower:]')
 D2=$(decode "$D1" | tr '[:upper:]' '[:lower:]')
 # Also expand backslash escape codes (\xHH, \x{H..}, octal \NNN or \0NNN,
-# \uXXXX, \UXXXXXXXX) with perl, which reads the whole text and never stops
+# \uX to \uXXXX, \UX to \UXXXXXXXX, as bash reads them) with perl, on the
+# original-case text, which reads the whole text and never stops
 # early the way printf %b does at \c. Without perl this pass is skipped.
 unescape() {
   command -v perl >/dev/null 2>&1 || return 0
   printf '%s' "$1" | perl -CSD -pe '
-    s/\\u([0-9a-fA-F]{4})/chr(hex $1)/ge;
-    s/\\U([0-9a-fA-F]{8})/chr(hex $1)/ge;
+    s/\\U([0-9a-fA-F]{1,8})/chr(hex $1)/ge;
+    s/\\u([0-9a-fA-F]{1,4})/chr(hex $1)/ge;
     s/\\x\{([0-9a-fA-F]{1,8})\}/chr(hex $1)/ge;
     s/\\x([0-9a-fA-F]{1,2})/chr(hex $1)/ge;
     s/\\0?([0-7]{1,3})/chr(oct $1)/ge;
   ' 2>/dev/null
 }
-E1=$(unescape "$LOWER" | tr '[:upper:]' '[:lower:]')
+E1=$(unescape "$TEXT" | tr '[:upper:]' '[:lower:]')
 E2=$(decode "$E1" | tr '[:upper:]' '[:lower:]')
 HAYSTACK="$LOWER"$'\n'"$D1"$'\n'"$D2"$'\n'"$E1"$'\n'"$E2"
 ASK_HIT=""
