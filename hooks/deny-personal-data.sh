@@ -115,7 +115,13 @@ decode() { local x="${1//+/ }"; x="${x//\\/\\\\}"; printf '%b' "${x//%/\\x}" 2>/
 LOWER=$(printf '%s' "$TEXT" | tr '[:upper:]' '[:lower:]')
 D1=$(decode "$LOWER" | tr '[:upper:]' '[:lower:]')
 D2=$(decode "$D1" | tr '[:upper:]' '[:lower:]')
-HAYSTACK="$LOWER"$'\n'"$D1"$'\n'"$D2"
+# Also expand backslash escapes (\x40, \100, and \u0040 by hand, since the
+# Mac's bash 3.2 printf lacks \u), so an @ written as an escape code is found.
+# \c is dropped first because printf would stop at it.
+unescape() { local x="${1//\\c/}"; x="${x//\\u0040/@}"; x="${x//\\u00000040/@}"; printf '%b' "$x" 2>/dev/null; }
+E1=$(unescape "$LOWER" | tr '[:upper:]' '[:lower:]')
+E2=$(decode "$E1" | tr '[:upper:]' '[:lower:]')
+HAYSTACK="$LOWER"$'\n'"$D1"$'\n'"$D2"$'\n'"$E1"$'\n'"$E2"
 ASK_HIT=""
 while IFS= read -r line || [ -n "$line" ]; do
   line="${line#"${line%%[![:space:]]*}"}"   # trim leading space
