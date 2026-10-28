@@ -76,9 +76,9 @@ URL_OR_MAIL='(https?|ftp|wss?)://|mailto:'
 
 case "$TOOL" in
   Bash|mcp__terminal__run_in_terminal)
-    # Bash: the command. Terminal tab: the command plus every other field.
+    # Bash: the command. Terminal tab: every text value in its input, unescaped.
     TEXT=$(printf '%s' "$INPUT" | jq -r 'if .tool_name == "Bash" then (.tool_input.command // empty)
-      else ((.tool_input.command // "") + "\n" + (.tool_input | tostring)) end' 2>/dev/null)
+      else ([.tool_input | .. | strings] | join("\n")) end' 2>/dev/null)
     [ -z "$TEXT" ] && exit 0
     # Program names are matched case-sensitively (commands are lower case), so
     # prose such as "Claude credit lines" in a heredoc is not taken for one.
