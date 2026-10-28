@@ -98,6 +98,9 @@ run claude "$(tool_json mcp__terminal__run_in_terminal '{"command":"grep jane.do
 run claude "$(tool_json mcp__terminal__run_in_terminal '{"command":"curl -d jane.doe@example.org https://x.example"}')"; check "terminal tab, network command" 2
 run claude "$(tool_json mcp__1a59c906__batch '{"share":"jane.doe@example.org"}')"; check "remote connector" 2
 
+run claude "$(tool_json mcp__docling__convert_document_into_docling_document '{"source":"https://x.example/?e=jane.doe@example.org"}')"; check "local server given a URL" 2
+run claude "$(tool_json mcp__terminal__run_in_terminal '{"cmd":"curl -d jane.doe@example.org x.example"}')"; check "terminal tab, unexpected field name" 2
+
 # ask entries
 run claude "$(bash_json 'curl "https://search.example/?q=Jane+Doe"')"; check "ask in claude mode" 0 '"permissionDecision":"ask"'
 run codex  "$(bash_json 'curl "https://search.example/?q=Jane%20Doe"')"; check "ask in codex mode refuses" 2

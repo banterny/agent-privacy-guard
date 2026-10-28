@@ -76,7 +76,9 @@ URL_OR_MAIL='(https?|ftp|wss?)://|mailto:'
 
 case "$TOOL" in
   Bash|mcp__terminal__run_in_terminal)
-    TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+    # Bash: the command. Terminal tab: the command plus every other field.
+    TEXT=$(printf '%s' "$INPUT" | jq -r 'if .tool_name == "Bash" then (.tool_input.command // empty)
+      else ((.tool_input.command // "") + "\n" + (.tool_input | tostring)) end' 2>/dev/null)
     [ -z "$TEXT" ] && exit 0
     # Program names are matched case-sensitively (commands are lower case), so
     # prose such as "Claude credit lines" in a heredoc is not taken for one.
@@ -84,8 +86,11 @@ case "$TOOL" in
       printf '%s\n' "$TEXT" | grep -qiE -- "$URL_OR_MAIL|$NET_LIBS" || exit 0
     ;;
   WebFetch|WebSearch|mcp__*)
-    [[ "$TOOL" =~ $LOCAL_MCP ]] && exit 0
     TEXT=$(printf '%s' "$INPUT" | jq -c '.tool_input // {}' 2>/dev/null)
+    # A local server's tool is skipped unless it was handed a web address.
+    if [[ "$TOOL" =~ $LOCAL_MCP ]]; then
+      printf '%s\n' "$TEXT" | grep -qiE -- "$URL_OR_MAIL" || exit 0
+    fi
     ;;
   *)
     exit 0
