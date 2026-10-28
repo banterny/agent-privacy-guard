@@ -104,6 +104,12 @@ Blocked calls are logged, without the value, to
   and mentions an identifier for a local reason (say `claude -p … ; grep you@…`)
   is refused. Split it into two commands.
 - Codex's built-in web search runs on OpenAI's side and cannot be hooked.
+- The identifiers-folder lock resolves real paths for file tools (and refuses
+  a Grep, Glob or list started from a folder that contains it, such as your
+  home folder), but for shell commands it can only read the text. A shell can
+  build the path in ways no text check sees, so the hard lock for shell
+  access is the operating-system sandbox: a filesystem deny entry for Codex,
+  or Claude Code's sandbox.
 - Your home folder name and file paths still reveal your username; nothing
   here hides those.
 - The mod reads one file and makes no network calls; the hook and plugin
