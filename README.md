@@ -24,7 +24,7 @@ reaching third-party servers.
 
 | Layer | Where | What |
 | --- | --- | --- |
-| Context | Claude Code mod `privacy-guard` | Drops the `userEmail` block, and blanks any listed identifier in loaded instruction files (`CLAUDE.md`, memory). Fails closed for the email block. |
+| Context | Claude Code mod `privacy-guard` | Drops the `userEmail` block, and blanks any listed identifier in loaded instruction files (`CLAUDE.md`, memory). Has a fail-closed handler for the email block (not exercised by the tests). |
 | Outbound | `hooks/deny-personal-data.sh` (Claude Code, Codex) and `opencode/privacy-guard.js` (OpenCode) | Refuses a tool call that would send a listed identifier off the machine: `WebFetch`, `WebSearch`, MCP tools, and shell commands that can reach the network (`curl`, `wget`, `gh`, `ssh`, AI CLIs, scripts using HTTP libraries, any URL). Also refuses a network command that reads `~/.claude.json`. |
 
 Your identifiers live in one private file, `~/.config/agent-privacy-guard/identifiers.txt`,
