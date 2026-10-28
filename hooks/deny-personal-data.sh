@@ -61,11 +61,13 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 # (codex, opencode, gh, git, npm...) still read them themselves; only the
 # agent's own tool calls are refused.
 CRED_FILES=".codex/auth.json .local/share/opencode/auth.json .config/opencode/cli.json .config/gh/hosts.yml .aws/credentials .netrc .git-credentials .docker/config.json .npmrc .pypirc .ssh"
-CRED_RE=""
-for f in $CRED_FILES; do CRED_RE="$CRED_RE|$(printf '%s' "$f" | sed 's/[.]/\\./g')"; done
-# Matched only after a home-folder prefix (~/, $HOME/, ${HOME}/, /Users/x/),
-# so a project's own .npmrc or .netrc is not caught.
-CRED_RE="(~|home\\}?|users/[^/]+)/(${CRED_RE#|})([^a-z0-9_]|\$)"
+# Names only a credential file has are caught anywhere (so `cd ~ && cat
+# .codex/auth.json` is caught too). Names a project may have of its own
+# (.npmrc, .netrc, .pypirc) are caught only after a home-folder prefix:
+# ~/, $HOME/, ${HOME}/, /Users/x/, /home/x/ or /root/.
+CRED_ANY='\.codex/auth\.json|\.local/share/opencode/auth\.json|opencode/cli\.json|\.config/gh/hosts\.yml|\.aws/credentials|\.git-credentials|\.docker/config\.json|(^|[^a-z0-9_])\.ssh/'
+CRED_HOME='(~|home\}?|users/[^/]+|home/[^/]+|root)/(\.npmrc|\.netrc|\.pypirc|\.ssh)([^a-z0-9_]|$)'
+CRED_RE="$CRED_ANY|$CRED_HOME"
 CRED_PATHS=()
 for f in $CRED_FILES; do CRED_PATHS+=("$HOME/$f"); done
 # File tools are judged by the path they touch (so a note that merely

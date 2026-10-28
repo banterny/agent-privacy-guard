@@ -94,6 +94,10 @@ run claude "$(bash_json 'cat $HOME/.config/gh/hosts.yml')"; check "cat gh login 
 run claude "$(bash_json 'cat ${HOME}/.netrc')"; check "cat .netrc via \${HOME}" 2
 run claude "$(bash_json 'ls /Users/x/.ssh/')"; check "list .ssh by full path" 2
 run claude "$(bash_json 'cat .npmrc')"; check "a project's own .npmrc is fine" 0
+run claude "$(bash_json 'cd ~ && cat .codex/auth.json')"; check "Codex login after cd ~" 2
+run claude "$(bash_json 'cd ~ && cat .ssh/id_ed25519')"; check "ssh key after cd ~" 2
+run claude "$(bash_json 'cat /home/u/.netrc')"; check ".netrc under /home/u" 2
+run claude "$(bash_json 'cat /root/.npmrc')"; check ".npmrc under /root" 2
 run claude "$(bash_json 'codex exec "summarise README"')"; check "running codex is fine" 0
 run claude "$(bash_json 'gh auth status')"; check "gh auth status is fine" 0
 run claude "$(jq -cn --arg p "$T/home/.config/opencode/cli.json" '{tool_name:"Read",cwd:"/x",tool_input:{file_path:$p}}')"; check "Read OpenCode cli.json" 2
