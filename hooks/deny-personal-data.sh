@@ -50,8 +50,10 @@ INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 [ -z "$TOOL" ] && exit 0
 
-# MCP servers that only act on this Mac (desktop app panes, code index, charts).
-LOCAL_MCP='^mcp__(ccd_[a-z_]+|codegraph|visualize|plugin-authoring)__'
+# MCP servers that only act on this Mac: desktop app panes and terminal tabs,
+# code index, charts, Word and PDF tools, scheduled tasks, the iOS simulator.
+# (The terminal's run_in_terminal is checked like Bash, below.)
+LOCAL_MCP='^mcp__(ccd_[a-z_]+|codegraph|visualize|plugin-authoring|terminal|adeu|docling|scheduled-tasks|plugin_pdf-viewer_pdf|Claude_Code_iOS_Simulator)__'
 
 # Programs that reach the network, in two groups. Matching ignores case (the
 # Mac's file system runs CURL as curl) and is done on a copy of the command
@@ -73,7 +75,7 @@ NET_LIBS='requests|urllib|http\.client|httpx|aiohttp|socket|smtplib|fetch\(|axio
 URL_OR_MAIL='(https?|ftp|wss?)://|mailto:'
 
 case "$TOOL" in
-  Bash)
+  Bash|mcp__terminal__run_in_terminal)
     TEXT=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
     [ -z "$TEXT" ] && exit 0
     # Program names are matched case-sensitively (commands are lower case), so

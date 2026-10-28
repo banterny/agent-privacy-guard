@@ -92,6 +92,12 @@ run claude "$(tool_json mcp__ccd_session__start_session '{"title":"t","prompt":"
 run claude "$(tool_json Read '{"file_path":"/x/jane.doe@example.org"}')"; check "Read tool ignored" 0
 run claude "$(tool_json WebFetch '{"url":"https://example.net","prompt":"summarise"}')"; check "WebFetch clean" 0
 
+run claude "$(tool_json mcp__adeu__apply_text_revision '{"text":"Signed, jane.doe@example.org"}')"; check "local Word tool" 0
+run claude "$(tool_json mcp__scheduled-tasks__create_scheduled_task '{"prompt":"email jane.doe@example.org"}')"; check "local scheduled task" 0
+run claude "$(tool_json mcp__terminal__run_in_terminal '{"command":"grep jane.doe@example.org notes.md"}')"; check "terminal tab, local command" 0
+run claude "$(tool_json mcp__terminal__run_in_terminal '{"command":"curl -d jane.doe@example.org https://x.example"}')"; check "terminal tab, network command" 2
+run claude "$(tool_json mcp__1a59c906__batch '{"share":"jane.doe@example.org"}')"; check "remote connector" 2
+
 # ask entries
 run claude "$(bash_json 'curl "https://search.example/?q=Jane+Doe"')"; check "ask in claude mode" 0 '"permissionDecision":"ask"'
 run codex  "$(bash_json 'curl "https://search.example/?q=Jane%20Doe"')"; check "ask in codex mode refuses" 2
