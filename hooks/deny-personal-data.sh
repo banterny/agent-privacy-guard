@@ -13,7 +13,10 @@
 # Lines starting with # and blank lines are ignored. A bare value means block.
 # Values shorter than 5 characters are ignored (they would match ordinary text).
 #
-# Which calls are checked (everything else is allowed without a look):
+# Any tool call that mentions ~/.config/agent-privacy-guard/ is refused, so
+# agents cannot read or change the list (wire the hook to file tools too).
+#
+# Which calls are checked for identifiers (everything else is allowed):
 #   - WebFetch, WebSearch, and MCP tools (mcp__*), except a few known to be
 #     local (see LOCAL_MCP below): the whole tool input is checked.
 #   - Bash: only when the command looks able to reach the network (a URL, or
@@ -44,11 +47,27 @@ LOG_FILE="$HOME/.local/state/agent-privacy-guard/blocked.log"
 MODE="${1:-claude}"
 
 command -v jq >/dev/null 2>&1 || exit 0
-[ -r "$IDS_FILE" ] || exit 0
 
 INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 [ -z "$TOOL" ] && exit 0
+
+# The identifiers file is a ready-made list of what to leak, so no tool call
+# of any kind may touch its folder. The guard and the Claude Code mod read it
+# themselves, outside the agent's tools. You edit it yourself.
+# File tools are judged by the path they touch (so a note that merely
+# mentions the folder can still be edited); every other tool by its whole input.
+PATH_FIELDS='if (.tool_name | test("^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__.*)$"))
+  then [.tool_input | (.file_path, .filePath, .notebook_path, .path,
+        (if $t == "Glob" then .pattern else empty end))] | map(select(type == "string")) | join("\n")
+  else (.tool_input // {} | tostring) end'
+if printf '%s' "$INPUT" | jq -r --arg t "$TOOL" "$PATH_FIELDS" 2>/dev/null |
+  grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt'; then
+  echo "Blocked by the agent privacy guard: ~/.config/agent-privacy-guard/ holds the user's private list of identifiers, and agents may not read, list, search, copy or change it. Do not retry or work around this. If the user wants the list changed, tell them to edit ~/.config/agent-privacy-guard/identifiers.txt themselves." >&2
+  exit 2
+fi
+
+[ -r "$IDS_FILE" ] || exit 0
 
 # MCP servers that only act on this Mac: desktop app panes and terminal tabs,
 # code index, charts, Word and PDF tools, scheduled tasks, the iOS simulator.

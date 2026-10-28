@@ -30,6 +30,16 @@ reaching third-party servers.
 Your identifiers live in one private file, `~/.config/agent-privacy-guard/identifiers.txt`,
 never in this repository. See `identifiers.example.txt`.
 
+That file is a ready-made list of what not to leak, so agents are kept out of
+it. The hook refuses any tool call that touches the folder (file tools are
+judged by the path they use, so a note that merely mentions it can still be
+edited); the guard and the mod read the file themselves, outside the agent's
+tools. You edit the list yourself. For a harder lock, also add Claude Code
+deny rules (`"Read(~/.config/agent-privacy-guard/**)"`,
+`"Edit(~/.config/agent-privacy-guard/**)"`) and, for Codex, a filesystem deny
+entry in your sandbox profile. Codex runs hooks outside its sandbox, so the
+guard can still read the file.
+
 ## Install
 
 ```bash
@@ -45,7 +55,7 @@ stable (these instructions use `~/.agents/hooks/`) and make it executable.
 - Claude Code, in `~/.claude/settings.json` under `hooks.PreToolUse`:
 
   ```json
-  { "matcher": "Bash|WebFetch|WebSearch|mcp__.*",
+  { "matcher": "Bash|WebFetch|WebSearch|mcp__.*|Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob",
     "hooks": [{ "type": "command", "command": "\"$HOME/.agents/hooks/deny-personal-data.sh\" claude", "timeout": 10 }] }
   ```
 

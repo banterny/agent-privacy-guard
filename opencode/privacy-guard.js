@@ -31,7 +31,10 @@ const LOCAL_TOOLS = new Set([
 // skip it. "opencode" mode: refusals only, since OpenCode has no ask step.
 function toHookInput(tool, args) {
   const name = String(tool ?? "").toLowerCase();
-  if (!name || LOCAL_TOOLS.has(name)) return null;
+  if (!name) return null;
+  // Local tools are still sent, so the script can refuse any that touch the
+  // identifiers folder; it checks nothing else for them.
+  if (LOCAL_TOOLS.has(name)) return { tool_name: `local__${name}`, tool_input: args ?? {} };
   if (name === "shell" || name === "bash") {
     const command = typeof args?.command === "string" ? args.command : "";
     return command ? { tool_name: "Bash", tool_input: { command } } : null;

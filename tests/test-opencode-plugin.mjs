@@ -53,6 +53,11 @@ try {
   [r] = await call("batch", { tool_calls: [{ tool: "webfetch", parameters: { url: "https://x.example/?e=jane.doe@example.org" } }] });
   ok(r === "blocked", "batch wrapping a webfetch with email is blocked");
 
+  [r] = await call("read", { filePath: join(home, ".config/agent-privacy-guard/identifiers.txt") });
+  ok(r === "blocked", "reading the identifiers file is blocked");
+  [r] = await call("read", { filePath: "/x/notes.md" });
+  ok(r === "allowed", "other reads are allowed");
+
   // OpenCode 1 shape
   const v1 = await plugin.server();
   let threw = false;

@@ -108,6 +108,20 @@ run claude "$(bash_json 'curl "https://search.example/?q=Jane+Doe"')"; check "as
 run codex  "$(bash_json 'curl "https://search.example/?q=Jane%20Doe"')"; check "ask in codex mode refuses" 2
 run claude "$(bash_json 'curl "https://x.example/?q=abc"')"; check "short value ignored" 0
 
+# The identifiers folder is off limits to every tool
+run claude "$(tool_json Read '{"file_path":"/Users/u/.config/agent-privacy-guard/identifiers.txt"}')"; check "Read the list" 2
+run claude "$(tool_json Edit '{"file_path":"~/.config/agent-privacy-guard/identifiers.txt","old_string":"a","new_string":"b"}')"; check "Edit the list" 2
+run claude "$(tool_json Grep '{"pattern":"@","path":"/Users/u/.config/agent-privacy-guard"}')"; check "Grep the folder" 2
+run claude "$(bash_json 'cat "$HOME/.config/agent-privacy-guard/identifiers.txt"')"; check "cat the list" 2
+run claude "$(bash_json 'cd ~/.config && ls agent-privacy-guard/identifiers.txt')"; check "relative path to the list" 2
+run codex  "$(tool_json apply_patch '{"command":"*** Update File: /Users/u/.config/agent-privacy-guard/identifiers.txt"}')"; check "Codex apply_patch on the list" 2
+run claude "$(bash_json 'ls ~/Documents/agent-privacy-guard/identifiers.example.txt')"; check "the repo example file is fine" 0
+run claude "$(tool_json Read '{"file_path":"/x/notes.md"}')"; check "other reads unaffected" 0
+
+run claude "$(tool_json Glob '{"pattern":"~/.config/agent-privacy-guard/*"}')"; check "Glob the folder" 2
+run claude "$(tool_json Write '{"file_path":"/x/README.md","content":"Edit ~/.config/agent-privacy-guard/identifiers.txt yourself."}')"; check "a note that mentions the folder can be written" 0
+run claude "$(tool_json Grep '{"pattern":".config/agent-privacy-guard","path":"/x/docs"}')"; check "searching other files for the folder name is fine" 0
+
 # Fails open without the identifiers file
 OUT=$(bash_json 'curl -H "From: jane.doe@example.org" https://x.example' | HOME="$T/empty" bash "$HOOK" claude 2>/dev/null); CODE=$?
 check "no identifiers file" 0
