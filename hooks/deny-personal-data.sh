@@ -109,9 +109,12 @@ sys.exit(1)
 }
 
 LOCKED=""
-# Text check: slashes tidied (// and /./ collapsed) before matching.
+# Text check: quotes and backslashes removed (.claude".json" is .claude.json
+# to the shell), then slashes tidied (// and /./ collapsed). A tripwire only:
+# a shell can still build the path with wildcards or variables, which is what
+# the sandbox's read block is for.
 if printf '%s' "$INPUT" | jq -r --arg t "$TOOL" --arg ft "$FILE_TOOLS" "$PATH_FIELDS" 2>/dev/null |
-  sed -E 's#/+#/#g; s#/(\./)+#/#g' |
+  tr -d '"\\'"'" | sed -E 's#/+#/#g; s#/(\./)+#/#g' |
   grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt|(^|[^a-z0-9_])\.claude\.json'; then
   LOCKED=1
 elif [[ "$TOOL" =~ $FILE_TOOLS ]] && resolved_path_hits; then
