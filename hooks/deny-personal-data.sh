@@ -21,7 +21,8 @@
 #     using a networking library). Then the whole command is checked.
 #   - Any network-capable Bash command that reads ~/.claude.json (which holds
 #     your account email, full name and organisation) is refused outright.
-# Each identifier is also matched URL-encoded (@ as %40, space as %20 or +).
+# Identifiers are also found when URL-encoded (the command is percent-decoded,
+# once and twice, before matching).
 #
 # Usage:   deny-personal-data.sh [claude|codex|opencode]   (default claude)
 #   Claude Code  ~/.claude/settings.json  PreToolUse matcher Bash|WebFetch|WebSearch|mcp__.*
@@ -54,9 +55,15 @@ LOCAL_MCP='^mcp__(ccd_[a-z_]+|codegraph|visualize|plugin-authoring)__'
 
 # Programs that reach the network. Matched as whole words in the command.
 NET_PROGS='curl|wget|https?|xh|httpie|aria2c|nc|ncat|netcat|socat|telnet|ssh|scp|sftp|rsync|ftp|lftp|gh|hub|glab|dig|nslookup|host|drill|whois|ping|mail|mailx|sendmail|msmtp|mutt|swaks|osascript|open|defuddle|playwright-cli|playwright|agent-browser|npx|bunx|pnpx|uvx|pipx|ctx7|opencode|codex|claude|gemini|llm|aider|ollama|firecrawl'
-# A program name counts only when a space or the line end follows it, so
-# open(...) or host= inside a script's code don't look like commands.
-NET_WORDS="(^|[^A-Za-z0-9_.-])($NET_PROGS)([[:space:]]|\$)"
+# A program name counts only in command position (line start, after ; & | (
+# or $(, after -c, or after sudo/env/xargs/...), optionally with a directory
+# in front, and followed by a space or the line end. Matched ignoring case
+# (the Mac's file system runs CURL as curl) on a copy of the command with
+# quotes and backslashes removed (c"u"rl and \curl run curl too). So prose
+# such as "Claude credit lines" mid-sentence, or open(...) in code, is not
+# taken for a command.
+CMD_POS='(^|[;&|(`]|\$\(|-c)[[:space:]]*((sudo|env|command|exec|xargs|nohup|time|nice)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*)*([^[:space:]]*/)?'
+NET_WORDS="$CMD_POS($NET_PROGS)([[:space:]]|\$)"
 # Signs that a script (python, node, ruby, perl...) talks to the network.
 NET_LIBS='requests|urllib|http\.client|httpx|aiohttp|socket|smtplib|fetch\(|axios|https?\.(request|get)|Net::HTTP|LWP|open-uri|/dev/(tcp|udp)/'
 URL_OR_MAIL='(https?|ftp|wss?)://|mailto:'
@@ -67,7 +74,7 @@ case "$TOOL" in
     [ -z "$TEXT" ] && exit 0
     # Program names are matched case-sensitively (commands are lower case), so
     # prose such as "Claude credit lines" in a heredoc is not taken for one.
-    printf '%s\n' "$TEXT" | grep -qE -- "$NET_WORDS" ||
+    printf '%s\n' "$TEXT" | tr -d '"\\'"'" | grep -qiE -- "$NET_WORDS" ||
       printf '%s\n' "$TEXT" | grep -qiE -- "$URL_OR_MAIL|$NET_LIBS" || exit 0
     ;;
   WebFetch|WebSearch|mcp__*)
@@ -96,7 +103,13 @@ if [ "$TOOL" = "Bash" ] && printf '%s\n' "$TEXT" | grep -qE -- '\.claude\.json|o
   refuse "data from ~/.claude.json (your account email, name and organisation)" "account-file"
 fi
 
-HAYSTACK=$(printf '%s' "$TEXT" | tr '[:upper:]' '[:lower:]')
+# Percent-decode (once and twice) so any URL-encoded form of a value is
+# caught, as well as + for a space in form encoding.
+decode() { local x="${1//+/ }"; printf '%b' "${x//%/\\x}" 2>/dev/null; }
+LOWER=$(printf '%s' "$TEXT" | tr '[:upper:]' '[:lower:]')
+D1=$(decode "$LOWER" | tr '[:upper:]' '[:lower:]')
+D2=$(decode "$D1" | tr '[:upper:]' '[:lower:]')
+HAYSTACK="$LOWER"$'\n'"$D1"$'\n'"$D2"
 ASK_HIT=""
 while IFS= read -r line || [ -n "$line" ]; do
   line="${line#"${line%%[![:space:]]*}"}"   # trim leading space
@@ -111,9 +124,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   [ "${#value}" -lt 5 ] && continue
   v=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
   hit=""
-  for variant in "$v" "${v//@/%40}" "${v//@/%2540}" "${v// /%20}" "${v// /+}"; do
-    case "$HAYSTACK" in *"$variant"*) hit=1; break ;; esac
-  done
+  case "$HAYSTACK" in *"$v"*) hit=1 ;; esac
   [ -z "$hit" ] && continue
   if [ "$action" = "ask" ]; then
     ASK_HIT=1

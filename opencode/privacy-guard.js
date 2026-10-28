@@ -18,10 +18,12 @@ const SCRIPT = path.join(os.homedir(), ".agents/hooks/deny-personal-data.sh");
 
 // Built-in tools that only touch this computer. Everything else (web fetch,
 // web search, MCP tools) is treated as able to reach a third party.
+// `batch` is deliberately absent: it runs other tools, so its whole input
+// is checked.
 const LOCAL_TOOLS = new Set([
   "read", "write", "edit", "multiedit", "patch", "apply_patch", "glob",
   "grep", "list", "ls", "todowrite", "todoread", "task", "skill",
-  "question", "lsp", "batch", "invalid", "plan_enter", "plan_exit",
+  "question", "lsp", "invalid", "plan_enter", "plan_exit",
 ]);
 
 // (Not exported: OpenCode 1 calls every exported function as a plugin.)

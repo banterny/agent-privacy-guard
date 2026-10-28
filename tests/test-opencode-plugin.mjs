@@ -50,6 +50,9 @@ try {
   [r] = await call("webfetch", { url: "https://example.net" });
   ok(r === "allowed", "clean webfetch is allowed");
 
+  [r] = await call("batch", { tool_calls: [{ tool: "webfetch", parameters: { url: "https://x.example/?e=jane.doe@example.org" } }] });
+  ok(r === "blocked", "batch wrapping a webfetch with email is blocked");
+
   // OpenCode 1 shape
   const v1 = await plugin.server();
   let threw = false;

