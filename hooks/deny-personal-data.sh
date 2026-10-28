@@ -52,11 +52,22 @@ INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 [ -z "$TOOL" ] && exit 0
 
-# Two locked places no tool call may touch: the identifiers folder (a
+# Locked places no tool call may touch: the identifiers folder (a
 # ready-made list of what to leak; the guard and the mod read it themselves,
-# outside the agent's tools, and you edit it yourself) and ~/.claude.json
+# outside the agent's tools, and you edit it yourself); ~/.claude.json
 # (Claude Code's account file: your name, organisation and login email;
-# Claude Code itself still reads and writes it).
+# Claude Code itself still reads and writes it); and the credential files
+# below, where tools keep saved logins and API keys. The tools that own them
+# (codex, opencode, gh, git, npm...) still read them themselves; only the
+# agent's own tool calls are refused.
+CRED_FILES=".codex/auth.json .local/share/opencode/auth.json .config/opencode/cli.json .config/gh/hosts.yml .aws/credentials .netrc .git-credentials .docker/config.json .npmrc .pypirc .ssh"
+CRED_RE=""
+for f in $CRED_FILES; do CRED_RE="$CRED_RE|$(printf '%s' "$f" | sed 's/[.]/\\./g')"; done
+# Matched only after a home-folder prefix (~/, $HOME/, ${HOME}/, /Users/x/),
+# so a project's own .npmrc or .netrc is not caught.
+CRED_RE="(~|home\\}?|users/[^/]+)/(${CRED_RE#|})([^a-z0-9_]|\$)"
+CRED_PATHS=()
+for f in $CRED_FILES; do CRED_PATHS+=("$HOME/$f"); done
 # File tools are judged by the path they touch (so a note that merely
 # mentions the folder can still be edited); every other tool by its whole input,
 # except the desktop app's own tools and charts, which cannot read files (a
@@ -110,7 +121,7 @@ for v, start, is_pattern in targets:
         if r == prot or r.startswith(prot + os.sep) or r.startswith(prot + "."): sys.exit(0)
         if search and (prot + os.sep).startswith(r.rstrip(os.sep) + os.sep): sys.exit(0)
 sys.exit(1)
-' "$HOME/.config/agent-privacy-guard" "$HOME/.claude.json" 2>/dev/null
+' "$HOME/.config/agent-privacy-guard" "$HOME/.claude.json" "${CRED_PATHS[@]}" 2>/dev/null
 }
 
 LOCKED=""
@@ -122,13 +133,13 @@ if [ -n "$APP_TOOL" ]; then
   :
 elif printf '%s' "$INPUT" | jq -r --arg t "$TOOL" --arg ft "$FILE_TOOLS" "$PATH_FIELDS" 2>/dev/null |
   tr -d '"\\'"'" | sed -E 's#/+#/#g; s#/(\./)+#/#g' |
-  grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt|(^|[^a-z0-9_])\.claude\.json'; then
+  grep -qiE -- "\\.config/agent-privacy-guard|agent-privacy-guard/identifiers\\.txt|(^|[^a-z0-9_])\\.claude\\.json|$CRED_RE"; then
   LOCKED=1
 elif [[ "$TOOL" =~ $FILE_TOOLS ]] && resolved_path_hits; then
   LOCKED=1
 fi
 if [ -n "$LOCKED" ]; then
-  echo "Blocked by the agent privacy guard: agents may not read, list, search, copy or change ~/.config/agent-privacy-guard/ (the user's private list of identifiers) or ~/.claude.json (the Claude Code account file, with the user's name, organisation and email). Do not retry or work around this. For Claude Code's MCP servers or settings, use 'claude mcp list' or ask the user. If the user wants the identifiers list changed, tell them to edit it themselves." >&2
+  echo "Blocked by the agent privacy guard: agents may not read, list, search, copy or change ~/.config/agent-privacy-guard/ (the user's private list of identifiers), ~/.claude.json (the Claude Code account file, with the user's name, organisation and email), or saved logins and API keys (such as ~/.codex/auth.json, ~/.local/share/opencode/auth.json, ~/.config/gh/hosts.yml, ~/.ssh, ~/.netrc). Do not retry or work around this. Tools such as codex, opencode and gh read their own logins themselves; use them directly. For Claude Code's MCP servers or settings, use 'claude mcp list' or ask the user. If the user wants the identifiers list changed, tell them to edit it themselves." >&2
   exit 2
 fi
 
