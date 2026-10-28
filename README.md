@@ -3,9 +3,11 @@
 Keeps your email address and other personal identifiers from leaking out of
 AI coding agents (Claude Code, Codex, OpenCode) into web requests.
 
-Sibling of [claude-code-secret-guard](https://github.com/banterny/claude-code-secret-guard),
-which stops secrets reaching git history. This one stops personal data
-reaching third-party servers.
+Sibling of [claude-code-secret-guard](https://github.com/banterny/claude-code-secret-guard)
+and its OpenCode port, [opencode-secret-guard](https://github.com/banterny/opencode-secret-guard),
+which stop secrets (API keys, tokens) reaching git history. This one stops
+personal data reaching third-party servers. They work independently, and
+fit together: install both for both kinds of protection.
 
 ## The problem
 
