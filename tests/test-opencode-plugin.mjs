@@ -55,6 +55,17 @@ try {
 
   [r] = await call("read", { filePath: join(home, ".config/agent-privacy-guard/identifiers.txt") });
   ok(r === "blocked", "reading the identifiers file is blocked");
+
+  // A file tool's `workdir` is ignored: paths resolve from OpenCode's folder.
+  let hook2;
+  await plugin.setup({
+    location: { directory: join(home, ".config/agent-privacy-guard") },
+    tool: { hook: async (name, fn) => { if (name === "execute.before") hook2 = fn; } },
+  });
+  let blocked2 = false;
+  try { await hook2({ tool: "read", input: { filePath: "identifiers.txt", workdir: "/tmp" } }); } catch { blocked2 = true; }
+  ok(blocked2, "a misleading workdir on a file tool does not move its paths");
+
   [r] = await call("read", { filePath: "/x/notes.md" });
   ok(r === "allowed", "other reads are allowed");
   [r] = await call("patch", { patchText: `*** Update File: ${join(home, ".config/agent-privacy-guard/identifiers.txt")}` });

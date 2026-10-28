@@ -76,9 +76,12 @@ async function setup(ctx) {
     await ctx.tool.hook("execute.before", async (event) => {
       const input = event?.input ?? {};
       const base = ctx.location?.directory;
-      const cwd = typeof input.workdir === "string" && input.workdir
+      // Only the shell tool runs in `workdir`; every other tool's paths are
+      // resolved from OpenCode's own folder, whatever `workdir` it carries.
+      const isShell = event?.tool === "shell" || event?.tool === "bash";
+      const cwd = isShell && typeof input.workdir === "string" && input.workdir
         ? path.resolve(base ?? process.cwd(), input.workdir)
-        : base;
+        : (base ?? process.cwd());
       const reason = await check(event?.tool, input, cwd);
       if (!reason) return;
       // Swap the command out first, so it cannot run even if a host ignored

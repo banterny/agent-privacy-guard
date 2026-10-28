@@ -79,20 +79,25 @@ prot = norm(os.path.realpath(sys.argv[1]))
 search = t in ("Grep", "Glob", "local__grep", "local__glob", "local__list", "local__ls")
 s = lambda k: i.get(k) if isinstance(i.get(k), str) and i.get(k) else None
 vals = [s(k) for k in ("file_path", "filePath", "notebook_path", "path")]
-base = s("path") or cwd
 if search and not s("path"): vals.append(cwd)
-def resolve(v, start):
+def absolute(v, start):
     v = os.path.expanduser(v.replace("${HOME}", "~").replace("$HOME", "~"))
-    # Cut at the first wildcard or other pattern syntax, back to a whole folder.
-    m = re.search(r"[*?\[\]{}()!@+|\\]", v)
-    if m: v = v[:m.start()].rsplit("/", 1)[0] or ("/" if v.startswith("/") else ".")
-    if not os.path.isabs(v): v = os.path.join(start, v)
+    return v if os.path.isabs(v) else os.path.join(start, v)
+def resolve(v, start, is_pattern=False):
+    v = absolute(v, start)
+    if is_pattern:
+        # Cut a pattern at its first wildcard or other pattern syntax, back
+        # to a whole folder. Literal paths are resolved whole.
+        m = re.search(r"[*?\[\]{}()!@+|\\]", v)
+        if m: v = v[:m.start()].rsplit("/", 1)[0] or "/"
     return norm(os.path.realpath(v))
-targets = [(v, cwd) for v in vals if v]
-# A Glob pattern counts from the Glob folder (its path), not the session.
-if t in ("Glob", "local__glob") and s("pattern"): targets.append((s("pattern"), base))
-for v, start in targets:
-    r = resolve(v, start)
+targets = [(v, cwd, False) for v in vals if v]
+# A Glob pattern counts from the Glob folder (its path, made absolute first).
+if t in ("Glob", "local__glob") and s("pattern"):
+    base = absolute(s("path"), cwd) if s("path") else cwd
+    targets.append((s("pattern"), base, True))
+for v, start, is_pattern in targets:
+    r = resolve(v, start, is_pattern)
     if r == prot or r.startswith(prot + os.sep): sys.exit(0)
     if search and (prot + os.sep).startswith(r.rstrip(os.sep) + os.sep): sys.exit(0)
 sys.exit(1)

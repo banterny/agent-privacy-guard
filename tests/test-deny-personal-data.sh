@@ -139,6 +139,10 @@ run claude "$(read_json "$T/HOME/.CONFIG/Agent-Privacy-Guard/identifiers.txt")";
 run claude "$(jq -cn --arg p "$T/home/.config" '{tool_name:"Glob",cwd:"/x",tool_input:{pattern:"agent-*/identifiers.txt",path:$p}}')"; check "relative Glob pattern counts from its path" 2
 run claude "$(jq -cn --arg p "$T/home/.config/agent-privacy-gu(a)rd/x" '{tool_name:"Glob",cwd:"/x",tool_input:{pattern:$p}}')"; check "other pattern syntax" 2
 
+ln -s "$P" "$T/odd(dir)"
+run claude "$(read_json "$T/odd(dir)/identifiers.txt")"; check "literal path with ( through a symbolic link" 2
+run claude "$(jq -cn --arg c "$T" '{tool_name:"Glob",cwd:$c,tool_input:{pattern:"agent-*/x",path:"home/.config"}}')"; check "relative Glob folder" 2
+
 # Fails open without the identifiers file
 OUT=$(bash_json 'curl -H "From: jane.doe@example.org" https://x.example' | HOME="$T/empty" bash "$HOOK" claude 2>/dev/null); CODE=$?
 check "no identifiers file" 0
