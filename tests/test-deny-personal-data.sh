@@ -122,6 +122,19 @@ run claude "$(tool_json Glob '{"pattern":"~/.config/agent-privacy-guard/*"}')"; 
 run claude "$(tool_json Write '{"file_path":"/x/README.md","content":"Edit ~/.config/agent-privacy-guard/identifiers.txt yourself."}')"; check "a note that mentions the folder can be written" 0
 run claude "$(tool_json Grep '{"pattern":".config/agent-privacy-guard","path":"/x/docs"}')"; check "searching other files for the folder name is fine" 0
 
+# Paths are resolved for file tools
+P="$T/home/.config/agent-privacy-guard"
+ln -s "$P" "$T/link"
+read_json() { jq -cn --arg p "$1" --arg c "${2:-/x}" '{tool_name:"Read",cwd:$c,tool_input:{file_path:$p}}'; }
+run claude "$(read_json "$T/home/.config/x/../agent-privacy-guard/identifiers.txt")"; check "path with .." 2
+run claude "$(read_json "$T/home/.config//agent-privacy-guard/./identifiers.txt")"; check "path with // and ./" 2
+run claude "$(read_json "agent-privacy-guard/identifiers.txt" "$T/home/.config")"; check "relative path" 2
+run claude "$(read_json "$T/link/identifiers.txt")"; check "symbolic link to the folder" 2
+run claude "$(jq -cn --arg p "$T/home" '{tool_name:"Grep",cwd:"/x",tool_input:{pattern:"@",path:$p}}')"; check "Grep from the home folder" 2
+run claude "$(jq -cn --arg c "$T/home" '{tool_name:"Grep",cwd:$c,tool_input:{pattern:"@"}}')"; check "Grep with no path, session in home" 2
+run claude "$(jq -cn --arg p "$T/home/Documents" '{tool_name:"Grep",cwd:"/x",tool_input:{pattern:"@",path:$p}}')"; check "Grep in another folder is fine" 0
+run claude "$(jq -cn --arg p "$T/home/.config/agent-*/*" '{tool_name:"Glob",cwd:"/x",tool_input:{pattern:$p}}')"; check "Glob with a wildcard above the folder" 2
+
 # Fails open without the identifiers file
 OUT=$(bash_json 'curl -H "From: jane.doe@example.org" https://x.example' | HOME="$T/empty" bash "$HOOK" claude 2>/dev/null); CODE=$?
 check "no identifiers file" 0

@@ -57,6 +57,10 @@ try {
   ok(r === "blocked", "reading the identifiers file is blocked");
   [r] = await call("read", { filePath: "/x/notes.md" });
   ok(r === "allowed", "other reads are allowed");
+  [r] = await call("patch", { patchText: `*** Update File: ${join(home, ".config/agent-privacy-guard/identifiers.txt")}` });
+  ok(r === "blocked", "patch tool on the identifiers file is blocked");
+  [r] = await call("grep", { pattern: "@", path: home });
+  ok(r === "blocked", "grep from the home folder is blocked");
 
   // OpenCode 1 shape
   const v1 = await plugin.server();

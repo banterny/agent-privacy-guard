@@ -57,12 +57,52 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 # themselves, outside the agent's tools. You edit it yourself.
 # File tools are judged by the path they touch (so a note that merely
 # mentions the folder can still be edited); every other tool by its whole input.
-PATH_FIELDS='if (.tool_name | test("^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__.*)$"))
+FILE_TOOLS='^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__(read|write|edit|multiedit|grep|glob|list|ls))$'
+PATH_FIELDS='if (.tool_name | test($ft))
   then [.tool_input | (.file_path, .filePath, .notebook_path, .path,
-        (if $t == "Glob" then .pattern else empty end))] | map(select(type == "string")) | join("\n")
+        (if ($t | test("^(Glob|local__glob)$")) then .pattern else empty end))] | map(select(type == "string")) | join("\n")
   else (.tool_input // {} | tostring) end'
-if printf '%s' "$INPUT" | jq -r --arg t "$TOOL" "$PATH_FIELDS" 2>/dev/null |
+
+# For file tools, also resolve each path for real (~, $HOME, relative to the
+# session folder, .., symbolic links) and refuse one inside the folder, or a
+# search (Grep, Glob, list) whose starting folder contains it. A wildcard
+# path counts from the folder before its first wildcard.
+resolved_path_hits() {
+  command -v python3 >/dev/null 2>&1 || return 1
+  printf '%s' "$INPUT" | python3 -I -c '
+import json, os, re, sys
+d = json.load(sys.stdin); t = d.get("tool_name", ""); i = d.get("tool_input") or {}
+cwd = d.get("cwd") or os.getcwd()
+prot = os.path.realpath(sys.argv[1])
+search = t in ("Grep", "Glob", "local__grep", "local__glob", "local__list", "local__ls")
+vals = [i.get(k) for k in ("file_path", "filePath", "notebook_path", "path")]
+if t in ("Glob", "local__glob"): vals.append(i.get("pattern"))
+vals = [v for v in vals if isinstance(v, str) and v]
+if search and not (isinstance(i.get("path"), str) and i.get("path")): vals.append(cwd)
+def resolve(v):
+    v = os.path.expanduser(v.replace("${HOME}", "~").replace("$HOME", "~"))
+    m = re.search(r"[*?\[{]", v)
+    if m: v = v[:m.start()].rsplit("/", 1)[0] or "/"
+    if not os.path.isabs(v): v = os.path.join(cwd, v)
+    return os.path.realpath(v)
+for v in vals:
+    r = resolve(v)
+    if r == prot or r.startswith(prot + os.sep): sys.exit(0)
+    if search and (prot + os.sep).startswith(r.rstrip(os.sep) + os.sep): sys.exit(0)
+sys.exit(1)
+' "$HOME/.config/agent-privacy-guard" 2>/dev/null
+}
+
+LOCKED=""
+# Text check: slashes tidied (// and /./ collapsed) before matching.
+if printf '%s' "$INPUT" | jq -r --arg t "$TOOL" --arg ft "$FILE_TOOLS" "$PATH_FIELDS" 2>/dev/null |
+  sed -E 's#/+#/#g; s#/(\./)+#/#g' |
   grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt'; then
+  LOCKED=1
+elif [[ "$TOOL" =~ $FILE_TOOLS ]] && resolved_path_hits; then
+  LOCKED=1
+fi
+if [ -n "$LOCKED" ]; then
   echo "Blocked by the agent privacy guard: ~/.config/agent-privacy-guard/ holds the user's private list of identifiers, and agents may not read, list, search, copy or change it. Do not retry or work around this. If the user wants the list changed, tell them to edit ~/.config/agent-privacy-guard/identifiers.txt themselves." >&2
   exit 2
 fi
