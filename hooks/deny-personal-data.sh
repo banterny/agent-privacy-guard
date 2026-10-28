@@ -53,17 +53,21 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 # MCP servers that only act on this Mac (desktop app panes, code index, charts).
 LOCAL_MCP='^mcp__(ccd_[a-z_]+|codegraph|visualize|plugin-authoring)__'
 
-# Programs that reach the network. Matched as whole words in the command.
-NET_PROGS='curl|wget|https?|xh|httpie|aria2c|nc|ncat|netcat|socat|telnet|ssh|scp|sftp|rsync|ftp|lftp|gh|hub|glab|dig|nslookup|host|drill|whois|ping|mail|mailx|sendmail|msmtp|mutt|swaks|osascript|open|defuddle|playwright-cli|playwright|agent-browser|npx|bunx|pnpx|uvx|pipx|ctx7|opencode|codex|claude|gemini|llm|aider|ollama|firecrawl'
-# A program name counts only in command position (line start, after ; & | (
-# or $(, after -c, or after sudo/env/xargs/...), optionally with a directory
-# in front, and followed by a space or the line end. Matched ignoring case
-# (the Mac's file system runs CURL as curl) on a copy of the command with
-# quotes and backslashes removed (c"u"rl and \curl run curl too). So prose
-# such as "Claude credit lines" mid-sentence, or open(...) in code, is not
-# taken for a command.
-CMD_POS='(^|[;&|(`]|\$\(|-c)[[:space:]]*((sudo|env|command|exec|xargs|nohup|time|nice)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*)*([^[:space:]]*/)?'
-NET_WORDS="$CMD_POS($NET_PROGS)([[:space:]]|\$)"
+# Programs that reach the network, in two groups. Matching ignores case (the
+# Mac's file system runs CURL as curl) and is done on a copy of the command
+# with quotes and backslashes removed (c"u"rl and \curl run curl too).
+#  - NET_PROGS: unambiguous names, counted wherever they stand as a word.
+#  - NET_PROSE: names that are also ordinary words ("Claude credit lines",
+#    "open the file", "dig into"), counted only where a command can start:
+#    line start, after ; & | ( { ! or $(, after -c, after a shell keyword
+#    (if, then, do...), a VAR=value assignment, or a wrapper (sudo, env,
+#    timeout...), with or without a directory in front.
+NET_PROGS='curl|wget|https?|xh|httpie|aria2c|nc|ncat|netcat|socat|telnet|ssh|scp|sftp|rsync|ftp|lftp|gh|hub|glab|nslookup|drill|whois|mailx|sendmail|msmtp|mutt|swaks|osascript|defuddle|playwright-cli|playwright|agent-browser|npx|bunx|pnpx|uvx|pipx|ctx7|ollama|firecrawl|opencode'
+NET_PROSE='open|host|dig|ping|mail|claude|codex|gemini|llm|aider'
+NET_ANY="(^|[^A-Za-z0-9_.-])($NET_PROGS)([[:space:]]|\$)"
+WRAP='(sudo|doas|env|command|exec|xargs|nohup|time|timeout|nice|stdbuf|caffeinate|watch|if|then|else|elif|do|while|until|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)'
+CMD_POS="(^|[;&|(\`{!]|\\\$\\(|-c)[[:space:]]*($WRAP[[:space:]]+(-[^[:space:]]+[[:space:]]+|[0-9.]+[smhd]?[[:space:]]+)*)*([^[:space:]]*/)?"
+NET_CMD="$CMD_POS($NET_PROSE)([[:space:]]|\$)"
 # Signs that a script (python, node, ruby, perl...) talks to the network.
 NET_LIBS='requests|urllib|http\.client|httpx|aiohttp|socket|smtplib|fetch\(|axios|https?\.(request|get)|Net::HTTP|LWP|open-uri|/dev/(tcp|udp)/'
 URL_OR_MAIL='(https?|ftp|wss?)://|mailto:'
@@ -74,7 +78,7 @@ case "$TOOL" in
     [ -z "$TEXT" ] && exit 0
     # Program names are matched case-sensitively (commands are lower case), so
     # prose such as "Claude credit lines" in a heredoc is not taken for one.
-    printf '%s\n' "$TEXT" | tr -d '"\\'"'" | grep -qiE -- "$NET_WORDS" ||
+    printf '%s\n' "$TEXT" | tr -d '"\\'"'" | grep -qiE -- "$NET_ANY|$NET_CMD" ||
       printf '%s\n' "$TEXT" | grep -qiE -- "$URL_OR_MAIL|$NET_LIBS" || exit 0
     ;;
   WebFetch|WebSearch|mcp__*)
@@ -105,7 +109,9 @@ fi
 
 # Percent-decode (once and twice) so any URL-encoded form of a value is
 # caught, as well as + for a space in form encoding.
-decode() { local x="${1//+/ }"; printf '%b' "${x//%/\\x}" 2>/dev/null; }
+# Backslashes are doubled first, so printf turns only %XX into characters
+# (a \c in the text would otherwise stop the output early).
+decode() { local x="${1//+/ }"; x="${x//\\/\\\\}"; printf '%b' "${x//%/\\x}" 2>/dev/null; }
 LOWER=$(printf '%s' "$TEXT" | tr '[:upper:]' '[:lower:]')
 D1=$(decode "$LOWER" | tr '[:upper:]' '[:lower:]')
 D2=$(decode "$D1" | tr '[:upper:]' '[:lower:]')
