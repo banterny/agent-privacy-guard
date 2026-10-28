@@ -42,6 +42,11 @@ deny rules (`"Read(~/.config/agent-privacy-guard/**)"`,
 entry in your sandbox profile. Codex runs hooks outside its sandbox, so the
 guard can still read the file.
 
+The same lock covers `~/.claude.json`, Claude Code's account file, which holds
+your full name, organisation and login email. Claude Code itself still reads
+and writes it; agents are pointed to `claude mcp list` instead. The matching
+deny rules are `"Read(~/.claude.json*)"` and `"Edit(~/.claude.json*)"`.
+
 ## Install
 
 ```bash

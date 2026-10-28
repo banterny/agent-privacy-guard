@@ -52,9 +52,11 @@ INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 [ -z "$TOOL" ] && exit 0
 
-# The identifiers file is a ready-made list of what to leak, so no tool call
-# of any kind may touch its folder. The guard and the Claude Code mod read it
-# themselves, outside the agent's tools. You edit it yourself.
+# Two locked places no tool call may touch: the identifiers folder (a
+# ready-made list of what to leak; the guard and the mod read it themselves,
+# outside the agent's tools, and you edit it yourself) and ~/.claude.json
+# (Claude Code's account file: your name, organisation and login email;
+# Claude Code itself still reads and writes it).
 # File tools are judged by the path they touch (so a note that merely
 # mentions the folder can still be edited); every other tool by its whole input.
 FILE_TOOLS='^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__(read|write|edit|multiedit|grep|glob|list|ls))$'
@@ -75,7 +77,7 @@ d = json.load(sys.stdin); t = d.get("tool_name", ""); i = d.get("tool_input") or
 cwd = d.get("cwd") or os.getcwd()
 # The Mac file system ignores case, so compare case-folded, NFC forms.
 norm = lambda p: unicodedata.normalize("NFC", p).casefold()
-prot = norm(os.path.realpath(sys.argv[1]))
+prots = [norm(os.path.realpath(p)) for p in sys.argv[1:]]
 search = t in ("Grep", "Glob", "local__grep", "local__glob", "local__list", "local__ls")
 s = lambda k: i.get(k) if isinstance(i.get(k), str) and i.get(k) else None
 vals = [s(k) for k in ("file_path", "filePath", "notebook_path", "path")]
@@ -98,23 +100,25 @@ if t in ("Glob", "local__glob") and s("pattern"):
     targets.append((s("pattern"), base, True))
 for v, start, is_pattern in targets:
     r = resolve(v, start, is_pattern)
-    if r == prot or r.startswith(prot + os.sep): sys.exit(0)
-    if search and (prot + os.sep).startswith(r.rstrip(os.sep) + os.sep): sys.exit(0)
+    for prot in prots:
+        # Inside a locked folder, or the locked file itself (and its backups).
+        if r == prot or r.startswith(prot + os.sep) or r.startswith(prot + "."): sys.exit(0)
+        if search and (prot + os.sep).startswith(r.rstrip(os.sep) + os.sep): sys.exit(0)
 sys.exit(1)
-' "$HOME/.config/agent-privacy-guard" 2>/dev/null
+' "$HOME/.config/agent-privacy-guard" "$HOME/.claude.json" 2>/dev/null
 }
 
 LOCKED=""
 # Text check: slashes tidied (// and /./ collapsed) before matching.
 if printf '%s' "$INPUT" | jq -r --arg t "$TOOL" --arg ft "$FILE_TOOLS" "$PATH_FIELDS" 2>/dev/null |
   sed -E 's#/+#/#g; s#/(\./)+#/#g' |
-  grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt'; then
+  grep -qiE -- '\.config/agent-privacy-guard|agent-privacy-guard/identifiers\.txt|(^|[^a-z0-9_])\.claude\.json'; then
   LOCKED=1
 elif [[ "$TOOL" =~ $FILE_TOOLS ]] && resolved_path_hits; then
   LOCKED=1
 fi
 if [ -n "$LOCKED" ]; then
-  echo "Blocked by the agent privacy guard: ~/.config/agent-privacy-guard/ holds the user's private list of identifiers, and agents may not read, list, search, copy or change it. Do not retry or work around this. If the user wants the list changed, tell them to edit ~/.config/agent-privacy-guard/identifiers.txt themselves." >&2
+  echo "Blocked by the agent privacy guard: agents may not read, list, search, copy or change ~/.config/agent-privacy-guard/ (the user's private list of identifiers) or ~/.claude.json (the Claude Code account file, with the user's name, organisation and email). Do not retry or work around this. For Claude Code's MCP servers or settings, use 'claude mcp list' or ask the user. If the user wants the identifiers list changed, tell them to edit it themselves." >&2
   exit 2
 fi
 
