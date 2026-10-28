@@ -68,7 +68,7 @@ FILE_TOOLS='^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__(read|writ
 PATH_FIELDS='if (.tool_name | test($ft))
   then [.tool_input | (.file_path, .filePath, .notebook_path, .path,
         (if ($t | test("^(Glob|local__glob)$")) then .pattern else empty end))] | map(select(type == "string")) | join("\n")
-  else (.tool_input // {} | tostring) end'
+  else ([.tool_input // {} | .. | strings] | join("\n")) end'
 
 # For file tools, also resolve each path for real (~, $HOME, relative to the
 # session folder, .., symbolic links) and refuse one inside the folder, or a
