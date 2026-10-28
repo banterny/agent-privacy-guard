@@ -83,15 +83,35 @@ Add it to a local marketplace, or try it for one session with
 Code's built-in guard loads (Team or Enterprise login, or a machine with
 managed settings): there, plugins may not change the context.
 
+## Session links and AI credit lines in commits
+
+Claude Code adds a `Claude-Session: https://claude.ai/code/session_…` line to
+commits, and a session link to pull requests, from cloud and Remote Control
+sessions, plus a `Co-Authored-By` line to every commit. The links are private
+by default, but they say which tool you used and name the session.
+
+- **On your own computer**, set in `~/.claude/settings.json`:
+  `"attribution": { "commit": "", "pr": "", "sessionUrl": false }`.
+  (`"commit": ""` alone does not remove the session link.)
+- **As a guarantee for every repository**, install `git-hooks/commit-msg` in
+  the folder named by `git config --global core.hooksPath`. It deletes
+  session-link lines and AI credit lines from each commit message as the
+  commit is made, whatever wrote them, and leaves everything else alone.
+- **Cloud sessions** read neither your user settings nor your global
+  `CLAUDE.md`. Paste `cloud/setup.sh` into your cloud environment's setup
+  script (claude.ai/code, your environment, Setup script). It writes the
+  instruction, the settings and the git hook into each cloud session.
+
 ## Test
 
 ```bash
 bash tests/test-deny-personal-data.sh      # the shell hook
 node tests/test-opencode-plugin.mjs        # the OpenCode wrapper
+bash tests/test-commit-msg.sh              # the commit-msg hook
 (cd claude-mod/privacy-guard && claude plugin test)   # the mod
 ```
 
-All three use fake identifiers in a throwaway home folder.
+All use fake identifiers in throwaway folders.
 
 To check the mod in a real session, start one with `claude -p` and one with
 `claude -p --safe-mode` (mods off), then search each session's transcript

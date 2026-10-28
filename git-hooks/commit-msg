@@ -1,0 +1,32 @@
+#!/bin/sh
+# agent-privacy-guard: git commit-msg hook.
+# Removes AI session links and AI credit lines from a commit message as the
+# commit is made, whoever or whatever wrote it:
+#   - "Claude-Session: https://claude.ai/code/session_..." trailers, and any
+#     other line carrying a claude.ai/code session link
+#   - "Co-Authored-By:" lines naming Claude, Anthropic, Codex, OpenAI or
+#     OpenCode
+#   - "Generated with [Claude Code]"-style lines
+# Everything else in the message is left exactly as written.
+#
+# Install for every repository: put this file in the folder named by
+# `git config --global core.hooksPath` and make it executable. Git passes the
+# message file's path as $1.
+
+MSG="$1"
+[ -n "$MSG" ] && [ -f "$MSG" ] || exit 0
+
+TMP="$MSG.privacy-guard.$$"
+# grep -v exits 1 when it removes every line; that is not an error here.
+grep -v -i -E \
+  -e '^[[:space:]]*Claude-Session:' \
+  -e 'claude\.ai/code/session_' \
+  -e '^[[:space:]]*Co-Authored-By:.*(claude|anthropic|codex|openai|opencode)' \
+  -e '^[[:space:]]*(🤖[[:space:]]*)?Generated (with|by) \[?(Claude|Codex|OpenCode)' \
+  "$MSG" >"$TMP"
+status=$?
+if [ "$status" -le 1 ]; then
+  cat "$TMP" >"$MSG"
+fi
+rm -f "$TMP"
+exit 0
