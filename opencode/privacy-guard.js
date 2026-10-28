@@ -43,9 +43,12 @@ function toHookInput(tool, args) {
 }
 
 // Resolves to the refusal reason, or null to allow.
-function check(tool, args, script = SCRIPT) {
+// `cwd` is OpenCode's working folder, so the script resolves relative paths
+// from the right place.
+function check(tool, args, cwd, script = SCRIPT) {
   const input = toHookInput(tool, args);
   if (!input) return Promise.resolve(null);
+  if (typeof cwd === "string" && cwd) input.cwd = cwd;
   return new Promise((resolve) => {
     let err = "";
     let child;
@@ -72,7 +75,11 @@ async function setup(ctx) {
   try {
     await ctx.tool.hook("execute.before", async (event) => {
       const input = event?.input ?? {};
-      const reason = await check(event?.tool, input);
+      const base = ctx.location?.directory;
+      const cwd = typeof input.workdir === "string" && input.workdir
+        ? path.resolve(base ?? process.cwd(), input.workdir)
+        : base;
+      const reason = await check(event?.tool, input, cwd);
       if (!reason) return;
       // Swap the command out first, so it cannot run even if a host ignored
       // the error, then reject the call.
@@ -85,10 +92,10 @@ async function setup(ctx) {
 }
 
 // OpenCode 1 (1.18.29+).
-async function server() {
+async function server({ directory } = {}) {
   return {
     "tool.execute.before": async (input, output) => {
-      const reason = await check(input?.tool, output?.args ?? input?.args);
+      const reason = await check(input?.tool, output?.args ?? input?.args, directory);
       if (reason) throw new Error(reason);
     },
   };

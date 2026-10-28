@@ -70,23 +70,29 @@ PATH_FIELDS='if (.tool_name | test($ft))
 resolved_path_hits() {
   command -v python3 >/dev/null 2>&1 || return 1
   printf '%s' "$INPUT" | python3 -I -c '
-import json, os, re, sys
+import json, os, re, sys, unicodedata
 d = json.load(sys.stdin); t = d.get("tool_name", ""); i = d.get("tool_input") or {}
 cwd = d.get("cwd") or os.getcwd()
-prot = os.path.realpath(sys.argv[1])
+# The Mac file system ignores case, so compare case-folded, NFC forms.
+norm = lambda p: unicodedata.normalize("NFC", p).casefold()
+prot = norm(os.path.realpath(sys.argv[1]))
 search = t in ("Grep", "Glob", "local__grep", "local__glob", "local__list", "local__ls")
-vals = [i.get(k) for k in ("file_path", "filePath", "notebook_path", "path")]
-if t in ("Glob", "local__glob"): vals.append(i.get("pattern"))
-vals = [v for v in vals if isinstance(v, str) and v]
-if search and not (isinstance(i.get("path"), str) and i.get("path")): vals.append(cwd)
-def resolve(v):
+s = lambda k: i.get(k) if isinstance(i.get(k), str) and i.get(k) else None
+vals = [s(k) for k in ("file_path", "filePath", "notebook_path", "path")]
+base = s("path") or cwd
+if search and not s("path"): vals.append(cwd)
+def resolve(v, start):
     v = os.path.expanduser(v.replace("${HOME}", "~").replace("$HOME", "~"))
-    m = re.search(r"[*?\[{]", v)
-    if m: v = v[:m.start()].rsplit("/", 1)[0] or "/"
-    if not os.path.isabs(v): v = os.path.join(cwd, v)
-    return os.path.realpath(v)
-for v in vals:
-    r = resolve(v)
+    # Cut at the first wildcard or other pattern syntax, back to a whole folder.
+    m = re.search(r"[*?\[\]{}()!@+|\\]", v)
+    if m: v = v[:m.start()].rsplit("/", 1)[0] or ("/" if v.startswith("/") else ".")
+    if not os.path.isabs(v): v = os.path.join(start, v)
+    return norm(os.path.realpath(v))
+targets = [(v, cwd) for v in vals if v]
+# A Glob pattern counts from the Glob folder (its path), not the session.
+if t in ("Glob", "local__glob") and s("pattern"): targets.append((s("pattern"), base))
+for v, start in targets:
+    r = resolve(v, start)
     if r == prot or r.startswith(prot + os.sep): sys.exit(0)
     if search and (prot + os.sep).startswith(r.rstrip(os.sep) + os.sep): sys.exit(0)
 sys.exit(1)
