@@ -1,0 +1,6 @@
+{
+  "name": "privacy-guard",
+  "version": "0.1.0",
+  "description": "Keeps your account email out of what Claude reads: drops the userEmail context block and blanks listed personal identifiers in loaded instruction files. Reads one local file; runs no programs and makes no network calls.",
+  "license": "MIT"
+}

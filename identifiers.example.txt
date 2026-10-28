@@ -1,0 +1,13 @@
+# Copy to ~/.config/agent-privacy-guard/identifiers.txt and `chmod 600` it.
+# Never commit your real list.
+#
+# One entry per line:
+#   block <value>   refuse any outbound tool call that contains it
+#   ask   <value>   Claude Code asks you first; Codex and OpenCode refuse
+# A bare value means block. Values under 5 characters are ignored.
+# Matching ignores case, and also catches URL-encoded forms (@ as %40,
+# space as %20 or +).
+
+block you@example.com
+block you@work.example
+# ask   Your Full Name
