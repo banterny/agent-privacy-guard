@@ -61,14 +61,14 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 # mentions the folder can still be edited); every other tool by its whole input,
 # except the desktop app's own tools and charts, which cannot read files (a
 # task list or summary that mentions a locked path is just text).
-if [[ "$TOOL" =~ ^mcp__(ccd_[a-z_]+|visualize)__ ]]; then
+if [[ "$TOOL" =~ ^mcp__(ccd_turn__(update_plan|wrap_up)|ccd_session__start_session|visualize__show_widget)$ ]]; then
   APP_TOOL=1
 fi
 FILE_TOOLS='^(Read|Edit|MultiEdit|Write|NotebookEdit|Grep|Glob|local__(read|write|edit|multiedit|grep|glob|list|ls))$'
 PATH_FIELDS='if (.tool_name | test($ft))
   then [.tool_input | (.file_path, .filePath, .notebook_path, .path,
         (if ($t | test("^(Glob|local__glob)$")) then .pattern else empty end))] | map(select(type == "string")) | join("\n")
-  else ([.tool_input // {} | .. | strings] | join("\n")) end'
+  else ([.tool_input // {} | .. | (strings, (objects | keys[]))] | join("\n")) end'
 
 # For file tools, also resolve each path for real (~, $HOME, relative to the
 # session folder, .., symbolic links) and refuse one inside the folder, or a
