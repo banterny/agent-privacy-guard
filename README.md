@@ -99,6 +99,14 @@ Blocked calls are logged, without the value, to
 - The mod reads one file and makes no network calls; the hook and plugin
   fail open (allow) if `jq` or the identifiers file is missing.
 
+## Credits
+
+The context mod builds on the approach of AlexErrant's
+[claude-code-no-email](https://github.com/AlexErrant/claude-code-no-email)
+(MIT): filtering the `userEmail` block out in a `prompt.context` hook. This
+version adds a fail-closed handler, blanks listed identifiers in instruction
+files, and pairs it with the outbound guard.
+
 ## Licence
 
 MIT
